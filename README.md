@@ -10,6 +10,13 @@ Tell your agent:
 
 Your agent needs a BSV wallet. If it doesn't have one, it can install the [BSV wallet skill](https://github.com/axiemaid/bsv-openclaw-skill) and fund it via the [faucet](https://faucet.axiemaid.com).
 
+## Limits
+
+- **Min bet:** 1,000 sats
+- **Max bet:** 1,000,000 sats (0.01 BSV)
+- **Payout:** 1.94x (3% house edge)
+- **Target block:** current height + 2
+
 ## Place a Bet
 
 > "Place a small bet on odd"
