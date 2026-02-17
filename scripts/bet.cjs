@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * BSV Block Bet Client v2 — Place bets by sending BSV to even/odd addresses.
+ * BSV Block Bet Client v3 — Place bets by sending BSV to even/odd addresses.
+ * No rounds — every bet is independent, SatoshiDice-style.
  */
 
 const https = require('https');
@@ -23,7 +24,7 @@ function httpReq(urlStr, method, body) {
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: url.pathname + url.search,
       method,
-      headers: { 'User-Agent': 'bsv-bet-client/2.0', 'Content-Type': 'application/json' }
+      headers: { 'User-Agent': 'bsv-bet-client/3.0', 'Content-Type': 'application/json' }
     };
     const req = lib.request(opts, (res) => {
       let data = '';
@@ -41,7 +42,7 @@ function httpReq(urlStr, method, body) {
 
 function httpGet(urlStr) {
   return new Promise((resolve, reject) => {
-    https.get(urlStr, { headers: { 'User-Agent': 'bsv-bet-client/2.0' } }, (res) => {
+    https.get(urlStr, { headers: { 'User-Agent': 'bsv-bet-client/3.0' } }, (res) => {
       let data = '';
       res.on('data', c => data += c);
       res.on('end', () => {
@@ -84,7 +85,18 @@ function ensureBsv() {
   try {
     return require('bsv');
   } catch {
+    // Try BSV wallet skill location first
+    const bsvSkillDir = path.join(__dirname, '..', '..', '..', 'bsv', 'bsv-openclaw-skill');
+    try {
+      return require(path.join(bsvSkillDir, 'node_modules', 'bsv'));
+    } catch {}
+    // Auto-install locally
+    const { execSync } = require('child_process');
     const skillDir = path.join(__dirname, '..');
+    if (!fs.existsSync(path.join(skillDir, 'node_modules', 'bsv'))) {
+      console.error('Installing bsv package...');
+      execSync('npm install bsv@2 --save --no-fund --no-audit', { cwd: skillDir, stdio: 'inherit' });
+    }
     return require(path.join(skillDir, 'node_modules', 'bsv'));
   }
 }
@@ -153,28 +165,13 @@ async function sendToAddress(toAddress, amountSats) {
 async function cmdStatus() {
   const res = await httpReq(`${BET_API}/status`, 'GET');
   const s = res.body;
-  console.log(`=== BSV Block Bet v2 ===`);
+  console.log(`=== BSV Block Bet v3 ===`);
   console.log(`\nBet by sending BSV to:`);
   console.log(`  Even: ${s.evenAddress || '(not available)'}`);
   console.log(`  Odd:  ${s.oddAddress || '(not available)'}`);
   console.log(`\nMin: ${s.config.minBet} sats | Max: ${s.config.maxBet} sats | Payout: ${s.config.payoutMult}x`);
-  if (s.queuedBets > 0) console.log(`Queued bets: ${s.queuedBets}`);
-  if (!s.currentRound) {
-    console.log('\nNo active round');
-    return;
-  }
-  const r = s.currentRound;
-  console.log(`\nCurrent Round:`);
-  console.log(`  Status:       ${r.status}`);
-  console.log(`  Target block: #${r.targetHeight}`);
-  console.log(`  Pool Even:    ${r.poolEven} sats`);
-  console.log(`  Pool Odd:     ${r.poolOdd} sats`);
-  console.log(`  Total Pool:   ${r.totalPool} sats`);
-  console.log(`  Bets placed:  ${r.bets}`);
-  if (r.blockHash) {
-    console.log(`  Block hash:   ${r.blockHash}`);
-    console.log(`  Parity:       ${r.parity}`);
-  }
+  if (s.currentHeight) console.log(`Chain height: #${s.currentHeight}`);
+  console.log(`Pending bets: ${s.pendingBets} (${s.totalPendingAmount} sats)`);
 }
 
 async function cmdBet(pick, amountSats) {
@@ -191,7 +188,6 @@ async function cmdBet(pick, amountSats) {
   const w = loadWallet();
   if (!w) { console.error('No wallet. Run: node wallet.cjs init'); process.exit(1); }
 
-  // Fetch addresses from service
   console.log(`Fetching bet addresses...`);
   const addrRes = await httpReq(`${BET_API}/address`, 'GET');
   if (addrRes.status !== 200) {
@@ -209,7 +205,7 @@ async function cmdBet(pick, amountSats) {
     const txid = await sendToAddress(targetAddress, amount);
     console.log(`✅ Bet placed! TXID: ${txid}`);
     console.log(`Pick: ${pick} | Amount: ${amount} sats`);
-    console.log(`The service will detect your bet automatically.`);
+    console.log(`Target block will be assigned when detected (~30s).`);
     console.log(`Check status: node bet.cjs check ${txid}`);
   } catch (e) {
     console.error(`❌ Failed: ${e.message}`);
@@ -226,22 +222,37 @@ async function cmdCheck(betId) {
   }
   const b = res.body;
   console.log(`Bet ${b.id}:`);
-  console.log(`  Pick:     ${b.pick}`);
-  console.log(`  Amount:   ${b.amount} sats`);
-  console.log(`  Status:   ${b.status}`);
-  console.log(`  Round:    ${b.roundHeight ? `block #${b.roundHeight}` : 'queued'}`);
-  console.log(`  Return:   ${b.returnAddress}`);
-  console.log(`  Tx:       ${b.depositTxid}`);
+  console.log(`  Pick:         ${b.pick}`);
+  console.log(`  Amount:       ${b.amount} sats`);
+  console.log(`  Status:       ${b.status}`);
+  console.log(`  Target block: #${b.targetHeight}`);
+  console.log(`  Return:       ${b.returnAddress}`);
+  console.log(`  Deposit tx:   ${b.depositTxid}`);
+  if (b.blockHash) {
+    console.log(`  Block hash:   ${b.blockHash}`);
+    console.log(`  Parity:       ${b.parity}`);
+  }
+  if (b.settleTxid) {
+    console.log(`  Settle tx:    ${b.settleTxid}`);
+  }
+  if (b.status === 'won') {
+    console.log(`  Payout:       ${Math.floor(b.amount * 1.94)} sats`);
+  }
 }
 
 async function cmdHistory() {
   const res = await httpReq(`${BET_API}/history`, 'GET');
-  const rounds = res.body.rounds || [];
-  if (!rounds.length) { console.log('No rounds yet'); return; }
-  console.log('=== Recent Rounds ===');
-  for (const r of rounds) {
-    const hash = r.blockHash ? r.blockHash.slice(-8) : '—';
-    console.log(`#${r.targetHeight} | ${r.status.padEnd(8)} | parity: ${(r.parity || '—').padEnd(4)} | pool: ${r.totalPool} sats | hash: ...${hash}`);
+  const blocks = res.body.blocks || [];
+  if (!blocks.length) { console.log('No settled bets yet'); return; }
+  console.log('=== Recent Settled Bets ===');
+  for (const block of blocks) {
+    const hash = block.blockHash ? block.blockHash.slice(-8) : '—';
+    console.log(`\nBlock #${block.targetHeight} | parity: ${block.parity || '—'} | hash: ...${hash}`);
+    for (const b of block.bets) {
+      const result = b.status === 'won' ? `✅ +${b.payout}` : `❌ -${b.amount}`;
+      const addr = b.returnAddress.slice(0, 8) + '...';
+      console.log(`  ${b.pick.padEnd(4)} | ${b.amount} sats | ${addr} | ${result}`);
+    }
   }
 }
 
@@ -254,7 +265,7 @@ async function cmdStats() {
   console.log(`Total payouts:  ${s.totalPayouts} sats`);
   console.log(`House profit:   ${s.houseProfit} sats`);
   console.log(`House balance:  ${s.houseBalance} sats`);
-  console.log(`Rounds played:  ${s.totalRounds}`);
+  console.log(`Blocks played:  ${s.totalBlocks}`);
   console.log(`Total bets:     ${s.totalBets} (${s.totalWins}W / ${s.totalLosses}L)`);
   console.log(`Unique players: ${s.uniquePlayers}`);
   console.log(`Even wins: ${s.evenWins} | Odd wins: ${s.oddWins}`);
@@ -262,7 +273,6 @@ async function cmdStats() {
 
 async function cmdPlayer(address) {
   if (!address) {
-    // Default to own wallet
     const w = loadWallet();
     if (!w) { console.error('Usage: node bet.cjs player <address>'); process.exit(1); }
     address = w.address;
@@ -280,7 +290,7 @@ async function cmdPlayer(address) {
     console.log(`\nRecent bets:`);
     for (const b of p.recentBets) {
       const result = b.status === 'won' ? `✅ +${b.payout}` : `❌ -${b.amount}`;
-      console.log(`  #${b.roundHeight} | ${b.pick.padEnd(4)} | ${b.amount} sats | ${result}`);
+      console.log(`  #${b.targetHeight} | ${b.pick.padEnd(4)} | ${b.amount} sats | ${result}`);
     }
   }
 }
@@ -313,11 +323,11 @@ const commands = {
 };
 
 if (!cmd || !commands[cmd]) {
-  console.log('BSV Block Bet Client v2 — Commands:');
-  console.log('  status              Current round + bet addresses');
-  console.log('  bet <even|odd> <sats>  Send BSV to bet (auto-detected by service)');
+  console.log('BSV Block Bet Client v3 — Commands:');
+  console.log('  status              Service status + bet addresses');
+  console.log('  bet <even|odd> <sats>  Send BSV to bet');
   console.log('  check <txid>        Check bet status by txid');
-  console.log('  history             Recent rounds');
+  console.log('  history             Recent settled bets by block');
   console.log('  stats               Global dashboard');
   console.log('  player [address]    Player profile (default: own wallet)');
   console.log('  leaderboard         Top players by profit');

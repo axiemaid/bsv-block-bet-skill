@@ -1,13 +1,15 @@
 ---
 name: block-bet
-description: Bet on BSV block hash parity (even/odd). SatoshiDice-style — just send BSV to bet.
+description: Bet on BSV block hash parity (even/odd). SatoshiDice-style — every bet is independent, no rounds.
 ---
 
 # BSV Block Bet
 
 Bet on whether the last hex character of a future BSV block hash is **even** (0,2,4,6,8,a,c,e) or **odd** (1,3,5,7,9,b,d,f).
 
-**Fixed odds: 1.94x payout** (3% house edge). No registration, no accounts — just send BSV.
+**Fixed odds: 1.94x payout** (3% house edge). No registration, no accounts, no rounds — just send BSV.
+
+Every bet is its own independent game. When detected, a target block (current height + 2) is assigned. When that block mines, the hash determines the winner.
 
 Service: `https://blockbet.axiemaid.com`
 
@@ -19,21 +21,21 @@ Service: `https://blockbet.axiemaid.com`
 
 ## How It Works
 
-1. Check the current round and get the bet addresses
+1. Check the service status and get the bet addresses
 2. Send BSV to the **even** or **odd** address — that's your bet
-3. Service detects your deposit automatically
-4. Target block mines → hash determines winner
+3. Service detects your deposit (~30s) and assigns target block = current height + 2
+4. Target block mines → last hex char of hash determines even/odd
 5. Winners get 1.94x sent back to their address
 
-No API call needed to bet. Just a BSV transaction.
+No rounds, no waiting windows. Every bet settles independently based on its own target block.
 
 ## Commands
 
-### Check current round
+### Check service status
 ```bash
 node scripts/bet.cjs status
 ```
-Shows the even/odd addresses, current round target block, pool sizes, and config.
+Shows even/odd addresses, current chain height, pending bets, and config.
 
 ### Place a bet
 ```bash
@@ -47,18 +49,19 @@ Always confirm with the user before placing a bet.
 ```bash
 node scripts/bet.cjs check <txid>
 ```
-Look up a bet by its deposit transaction ID.
+Look up a bet by its deposit transaction ID. Shows target block, status, block hash/parity when settled.
 
-### Recent rounds
+### Recent settled bets
 ```bash
 node scripts/bet.cjs history
 ```
+Shows recently settled bets grouped by target block.
 
 ### Global stats
 ```bash
 node scripts/bet.cjs stats
 ```
-Total wagered, house profit, rounds played, win distribution.
+Total wagered, house profit, blocks played, win distribution.
 
 ### Player profile
 ```bash
@@ -74,7 +77,7 @@ Top players ranked by profit. Alias: `lb`.
 
 ## Bet Addresses
 
-These are permanent — same addresses every round:
+These are permanent — same addresses always:
 
 | Pick | Address |
 |------|---------|
@@ -83,12 +86,13 @@ These are permanent — same addresses every round:
 
 Or fetch them live: `GET https://blockbet.axiemaid.com/address`
 
-## Round Timing
+## Bet Lifecycle
 
-- Rounds target a block ~3 blocks ahead of current height
-- Betting closes 1 block before target (buffer)
-- Late deposits roll into the next round
-- New round starts automatically after settlement
+1. Player sends BSV to even/odd address
+2. Service detects UTXO (~30s poll), assigns target block = current + 2
+3. When target block mines, hash parity is checked
+4. Settlement TX built: bet UTXOs as inputs, winner payouts as outputs
+5. Each bet is independent — multiple bets can target different blocks simultaneously
 
 ## API (read-only)
 
@@ -96,11 +100,10 @@ All endpoints at `https://blockbet.axiemaid.com`:
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /status` | Current round, addresses, config |
+| `GET /status` | Service status, addresses, pending bets, config |
 | `GET /address` | Even/odd/house addresses |
-| `GET /bet/:txid` | Bet details by deposit txid |
-| `GET /round/:height` | Round results |
-| `GET /history` | Recent rounds |
+| `GET /bet/:txid` | Bet details (includes targetHeight, blockHash, parity) |
+| `GET /history` | Recent settled bets grouped by target block |
 | `GET /stats` | Global dashboard |
 | `GET /player/:address` | Player profile |
 | `GET /leaderboard` | Top players |
@@ -110,4 +113,5 @@ All endpoints at `https://blockbet.axiemaid.com`:
 - Bets below 1,000 or above 100,000 sats are ignored
 - The service resolves your return address from your transaction's inputs
 - All bets and payouts are on-chain BSV transactions
+- Bets targeting the same block are settled in one transaction for efficiency
 - Source: https://github.com/axiemaid/bsv-block-bet
