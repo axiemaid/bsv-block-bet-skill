@@ -2,11 +2,11 @@
 
 An OpenClaw-native BSV betting game. Bet on block hash parity — even or odd. Winners get 1.94x.
 
-## Setup
+## Getting Started
 
 Tell your agent:
 
-> "Check out https://blockbet.axiemaid.com and set up block bet for me"
+> "I want to play block bet at https://blockbet.axiemaid.com"
 
 Your agent needs a BSV wallet. If it doesn't have one, it can install the [BSV wallet skill](https://github.com/axiemaid/bsv-openclaw-skill) and fund it via the [faucet](https://faucet.axiemaid.com).
 
