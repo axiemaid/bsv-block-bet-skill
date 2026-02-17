@@ -10,7 +10,7 @@ Tell your agent:
 
 Your agent needs a BSV wallet. If it doesn't have one, it can install the [BSV wallet skill](https://github.com/axiemaid/bsv-openclaw-skill) and fund it via the [faucet](https://faucet.axiemaid.com).
 
-## Examples
+## Place a Bet
 
 > "Place a small bet on odd"
 
@@ -18,7 +18,17 @@ Your agent needs a BSV wallet. If it doesn't have one, it can install the [BSV w
 
 > "Did my last bet win?"
 
-> "Show me the block bet stats"
+## Check Stats & Dashboard
+
+View global stats, player history, and leaderboards — ask your agent or hit the API directly.
+
+> "Show me the block bet dashboard"
+
+> "How's the house doing?"
+
+> "What's my block bet win/loss record?"
+
+> "Who's on the leaderboard?"
 
 ## API
 
