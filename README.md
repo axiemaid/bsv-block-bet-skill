@@ -1,8 +1,40 @@
 # BSV Block Bet
 
-Bet on whether the last hex character of a future BSV block hash is **even** or **odd**. Winners get **1.94x** their bet. House is the bank.
+**An OpenClaw-native betting service.** Bet on whether the last hex character of a future BSV block hash is even or odd. Winners get 1.94x. House is the bank.
 
-**Live service:** https://blockbet.axiemaid.com
+Built for AI agents on [OpenClaw](https://openclaw.ai) — no UI, no accounts. Just talk to your agent.
+
+## Talk to Your Agent
+
+The fastest way to use Block Bet is natural language. Just tell your agent:
+
+> "Check out https://blockbet.axiemaid.com and tell me how it works"
+
+Your agent will read the service docs, understand the rules, and be ready to play. Then:
+
+> "Bet 5000 sats on even"
+
+> "Bet 0.001 BSV on odd"
+
+> "Did my bet win?"
+
+> "What's the block bet leaderboard?"
+
+> "Show me my block bet history"
+
+> "What's the house balance?"
+
+Your agent handles everything — wallet, transaction, result checking.
+
+## Prerequisites
+
+Your agent needs a BSV wallet. If it doesn't have one:
+
+> "Install the BSV wallet skill from https://github.com/axiemaid/bsv-openclaw-skill"
+
+Then fund it:
+
+> "Claim BSV from the faucet at https://faucet.axiemaid.com"
 
 ## How It Works
 
@@ -11,7 +43,12 @@ Bet on whether the last hex character of a future BSV block hash is **even** or 
 3. When the target block is mined, the last hex char of its hash decides the result.
 4. Win → 1.94x sent back to your address. Lose → nothing.
 
-No accounts, no registration. Just send BSV.
+## Rules
+
+- **Min bet:** 1,000 sats
+- **Max bet:** 1,000,000 sats (0.01 BSV)
+- **Payout:** 1.94x (97% RTP, 3% house edge)
+- **Target block:** current chain height + 2
 
 ## Addresses
 
@@ -20,30 +57,9 @@ No accounts, no registration. Just send BSV.
 | Even (0,2,4,6,8,a,c,e) | `1PdPC3WLC3HP1x69kMgzu1FVmKgGptBvJn` |
 | Odd (1,3,5,7,9,b,d,f) | `1LVmjDYgqgvnVr3od8DWBzxreB8JgiNTpU` |
 
-## Rules
-
-- **Min bet:** 1,000 sats
-- **Max bet:** 1,000,000 sats (0.01 BSV)
-- **Payout:** 1.94x (97% RTP, 3% house edge)
-- **Target block:** current chain height + 2
-
-## Check Your Bet
-
-**Via API:**
-```
-GET https://blockbet.axiemaid.com/bet/<txid>:<vout>
-```
-
-**Via natural language:** Just ask your agent — "did my bet win?" or "check my block bet."
-
-## Quick Start for OpenClaw Agents
-
-1. **Get a BSV wallet** — install the [BSV wallet skill](https://github.com/axiemaid/bsv-openclaw-skill)
-2. **Fund it** — claim from the [faucet](https://faucet.axiemaid.com) or receive BSV
-3. **Bet** — send sats to the even or odd address using `node scripts/wallet.cjs send <address> <amount_bsv>`
-4. **Check result** — ask your agent or hit the API
-
 ## API
+
+Full docs available at the root endpoint: **https://blockbet.axiemaid.com**
 
 | Endpoint | Description |
 |----------|-------------|
@@ -54,15 +70,3 @@ GET https://blockbet.axiemaid.com/bet/<txid>:<vout>
 | `GET /player/:address` | Player bet history and stats |
 | `GET /leaderboard` | Top players by profit |
 | `GET /history` | Recent settled bets by block |
-
-## Optional Client Script
-
-The `scripts/bet.cjs` script wraps betting into a single command, but it's not required. The API endpoint at `blockbet.axiemaid.com/` explains everything an agent needs.
-
-```bash
-# Place a bet
-node scripts/bet.cjs even 1000
-
-# Check a bet
-node scripts/bet.cjs check <txid>:<vout>
-```
