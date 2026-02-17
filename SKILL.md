@@ -13,9 +13,9 @@ Service: `https://blockbet.axiemaid.com`
 
 ## Prerequisites
 
-A BSV wallet with funds. The BSV skill (`scripts/wallet.cjs`) works, or any BSV wallet that can send to an address.
-
-First run auto-installs the `bsv` npm package.
+- **BSV skill** — needed for wallet management (`wallet.cjs`). Install from: https://github.com/axiemaid/bsv-openclaw-skill
+- A funded BSV wallet (`node scripts/wallet.cjs init` via the BSV skill)
+- First run auto-installs the `bsv` npm package
 
 ## How It Works
 
